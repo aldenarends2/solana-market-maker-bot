@@ -1,4 +1,9 @@
-name: QA Heartbeat\n\npermissions:\n  contents: write\n\n
+name: QA Heartbeat
+
+permissions:
+  contents: write
+
+\n\npermissions:\n  contents: write\n\n
 on:
   schedule:
     - cron: "*/30 * * * *"
