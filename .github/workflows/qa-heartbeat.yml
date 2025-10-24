@@ -34,6 +34,8 @@ jobs:
           if [ "$failures" -gt 0 ]; then status=fail ; summary="Automated QA heartbeat - smoke failed ($failures)" ; fi
           echo "status=$status" >> "$GITHUB_OUTPUT"
           echo "summary=$summary" >> "$GITHUB_OUTPUT"
+      - name: Install Octokit
+        run: npm install @octokit/rest
       - name: Update QA feeds
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
