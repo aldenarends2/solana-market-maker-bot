@@ -36,11 +36,11 @@ jobs:
           echo "summary=$summary" >> "$GITHUB_OUTPUT"
       - name: Install Octokit
         run: npm install @octokit/rest
-            - name: Update QA feeds
+                  - name: Update QA feeds
         id: update
-        continue-on-error: true
+        continue-on-error: false
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}
           STATUS: ${{ steps.smoke.outputs.status }}
           SUMMARY: ${{ steps.smoke.outputs.summary }}
         run: |
