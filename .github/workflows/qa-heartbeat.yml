@@ -15,8 +15,31 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+      - name: Smoke checks (optional)
+        id: smoke
+        shell: bash
+        run: |
+          set -e
+          status=ok
+          summary="Automated QA heartbeat"
+          failures=0
+          check() { url="$1" ; name="$2" ; if [ -n "$url" ]; then curl -sS --max-time 10 "$url" >/dev/null || { echo "::warning:: $name failed" ; failures=$((failures+1)) ; } ; fi }
+          check "${{ secrets.SMOKE_RPC_URL }}" "RPC"
+          check "${{ secrets.SMOKE_BOT_API }}/health" "Bot API"
+          check "${{ secrets.SMOKE_DASHBOARD_URL }}" "Dashboard"
+          if [ "$failures" -gt 0 ]; then status=fail ; summary="Automated QA heartbeat - smoke failed ($failures)" ; fi
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          echo "summary=$summary" >> "$GITHUB_OUTPUT"
       - name: Update QA feeds
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          STATUS: ${{ steps.smoke.outputs.status }}
+          SUMMARY: ${{ steps.smoke.outputs.summary }}
         run: |
           node scripts/update_pages_feed.js
+      - name: Slack alert on failure (optional)
+        if: steps.smoke.outputs.status == 'fail' && env.SLACK_WEBHOOK_URL != ''
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          curl -X POST -H 'Content-type: application/json' --data "{\"text\":\"$GITHUB_REPOSITORY QA heartbeat failed: ${{ steps.smoke.outputs.summary }}\"}" "$SLACK_WEBHOOK_URL"
