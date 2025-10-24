@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>QA Dashboard â€“ Pages Feed</title>
+  <style>
+    :root {
+      --bg: #0f1220;
+      --panel: #161a2e;
+      --text: #e6eaf5;
+      --muted: #9aa3b2;
+      --green: #2ecc71;
+      --red: #e74c3c;
+      --yellow: #f1c40f;
+      --blue: #4aa3ff;
+      --border: #2a2f45;
+    }
+    html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, 'Fira Sans', 'Droid Sans', 'Helvetica Neue', Arial, sans-serif; }
+    a { color: var(--blue); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .wrap { max-width: 1080px; margin: 24px auto; padding: 0 16px; }
+    header { margin-bottom: 16px; }
+    header h1 { font-size: 22px; margin: 0; font-weight: 600; }
+    header .sub { color: var(--muted); margin-top: 6px; font-size: 14px; }
+
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 16px; }
+    .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
+    .card h3 { margin: 0 0 8px; font-size: 14px; color: var(--muted); font-weight: 500; }
+    .stat { font-size: 24px; font-weight: 700; }
+    .stat.pass { color: var(--green); }
+    .stat.fail { color: var(--red); }
+
+    .latest { margin-top: 18px; }
+    .latest .content { display: flex; gap: 16px; flex-wrap: wrap; }
+    .badge { display: inline-block; padding: 4px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; border: 1px solid var(--border); }
+    .badge.pass { color: var(--green); border-color: #1f4737; background: #122a21; }
+    .badge.fail { color: var(--red); border-color: #4a2622; background: #2a1917; }
+    .badge.info { color: var(--yellow); border-color: #4a3d1f; background: #2a2417; }
+
+    table { width: 100%; border-collapse: collapse; margin-top: 18px; }
+    thead th { text-align: left; font-size: 12px; color: var(--muted); font-weight: 500; border-bottom: 1px solid var(--border); padding: 8px; }
+    tbody td { padding: 10px 8px; border-bottom: 1px solid var(--border); font-size: 14px; }
+    tbody tr:hover { background: rgba(255,255,255,0.03); }
+    .result-pass { color: var(--green); font-weight: 600; }
+    .result-fail { color: var(--red); font-weight: 600; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 12px; color: var(--muted); }
+
+    .note { margin-top: 8px; color: var(--muted); font-size: 13px; }
+    .footer { margin-top: 24px; color: var(--muted); font-size: 12px; }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>QA Dashboard â€“ Pages Feed</h1>
+      <div id="healthBadge" style="font-size:1.2em;font-weight:bold;margin-top:8px"></div>
+      <div class="sub">Live metrics sourced from <code>data/qa-results.json</code>. Updates automatically after each QA issue closure.</div>
+      <div style="margin-top:8px">
+        <label for="filter" class="mono">Filter:</label>
+        <select id="filter">
+          <option value="all">All</option>
+          <option value="Pass">Pass</option>
+          <option value="Fail">Fail</option>
+        </select>
+      </div>
+    </header>
+
+    <section class="grid">
+      <div class="card">
+        <h3>Total QAs</h3>
+        <div id="stat-total" class="stat">â€“</div>
+      </div>
+      <div class="card">
+        <h3>Pass Rate</h3>
+        <div id="stat-passrate" class="stat pass">â€“</div>
+      </div>
+      <div class="card">
+        <h3>Failures</h3>
+        <div id="stat-fails" class="stat fail">â€“</div>
+      </div>
+    </section>
+
+    <section class="card latest">
+      <h3>Latest QA</h3>
+      <div id="latest" class="content">Loadingâ€¦</div>
+    </section>
+
+    <section class="card">
+      <h3>Pass Rate Trend</h3>
+      <canvas id="trendChart" height="120"></canvas>
+      <div class="note">Cumulative pass rate (%) across feed history.</div>
+    </section>
+
+    <section class="card">
+      <h3>Recent Results</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Timestamp</th>
+            <th>PR</th>
+            <th>Result</th>
+            <th>Checklist</th>
+            <th>Issue</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <div class="note">Showing up to the last 50 results. Data is sourced from the Pages feed and requires no backend.</div>
+    </section>
+
+    <div class="footer">Built from GitHub Issues â†’ Bot â†’ Feed â†’ Pages. This page reads the JSON feed directly.</div>
+  </div>
+
+  <script>
+    let dataRecords = [];
+    let chart = null;
+
+    function fmtTs(ts) {
+      const d = new Date(Number(ts));
+      return d.toLocaleString();
+    }
+
+    async function fetchFeed() {
+      const res = await fetch('qa-results.json?_=' + Date.now(), { cache: 'no-store' });
+      if (!res.ok) throw new Error('Feed not available: ' + res.status);
+      const raw = await res.json();
+      if (!Array.isArray(raw)) throw new Error('Feed is not a JSON array');
+      dataRecords = raw
+        .map(r => ({
+          ts: Number(r.ts) || Date.now(),
+          pr: r.pr || r.PR_NUMBER || null,
+          result: r.result || 'Unknown',
+          passed: Number(r.passed) || 0,
+          total: Number(r.total) || 0,
+          failed: Number(r.failed) || (Number(r.total||0) - Number(r.passed||0)),
+          issue: r.issue || r.issue_url || null
+        }))
+        .sort((a, b) => a.ts - b.ts);
+    }
+
+    function renderStatsAndLatest(records) {
+      const total = records.length;
+      const passCount = records.filter(r => /pass/i.test(r.result)).length;
+      const failCount = records.filter(r => /fail/i.test(r.result)).length;
+      const passRate = total ? Math.round((passCount / total) * 100) : 0;
+
+      document.getElementById('stat-total').textContent = String(total);
+      document.getElementById('stat-passrate').textContent = passRate + '%';
+      document.getElementById('stat-fails').textContent = String(failCount);
+
+      const recent = records.slice(-20);
+      const recentPass = recent.filter(r => /pass/i.test(r.result)).length;
+      const recentRate = recent.length ? Math.round((recentPass / recent.length) * 100) : 0;
+      const badge = recentRate > 90 ? 'âœ… Stable' : (recentRate > 70 ? 'âš ï¸ Degrading' : 'âŒ Critical');
+      document.getElementById('healthBadge').textContent = `QA Health: ${badge}`;
+
+      const latest = records[records.length - 1];
+      const latestEl = document.getElementById('latest');
+      if (!latest) {
+        latestEl.textContent = 'No records yet.';
+      } else {
+        const badgeClass = /pass/i.test(latest.result) ? 'pass' : (/fail/i.test(latest.result) ? 'fail' : 'info');
+        latestEl.innerHTML = `
+          <span class="badge ${badgeClass}">${latest.result}</span>
+          <span>PR <span class="mono">#${latest.pr ?? 'â€”'}</span></span>
+          <span>${latest.passed}/${latest.total} passed (${latest.failed} failed)</span>
+          <span>${fmtTs(latest.ts)}</span>
+          ${latest.issue ? `<a href="${latest.issue}" target="_blank" rel="noopener">QA Issue</a>` : ''}
+        `;
+      }
+    }
+
+    function renderTable(records) {
+      const filterEl = document.getElementById('filter');
+      const mode = filterEl ? filterEl.value : 'all';
+      const tbody = document.getElementById('rows');
+      tbody.innerHTML = '';
+      const recent = records
+        .filter(r => mode === 'all' || r.result === mode)
+        .slice().reverse().slice(0, 50);
+      recent.forEach(r => {
+        const tr = document.createElement('tr');
+        const resultClass = /pass/i.test(r.result) ? 'result-pass' : (/fail/i.test(r.result) ? 'result-fail' : '');
+        tr.innerHTML = `
+          <td>${fmtTs(r.ts)}</td>
+          <td>#${r.pr ?? 'â€”'}</td>
+          <td class="${resultClass}">${r.result}</td>
+          <td>${r.passed}/${r.total} (${r.failed} failed)</td>
+          <td>${r.issue ? `<a href="${r.issue}" target="_blank" rel="noopener">link</a>` : 'â€”'}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function renderChart(records) {
+      const labels = records.map(r => new Date(r.ts).toLocaleDateString());
+      const passRates = records.map((_, i) => {
+        const subset = records.slice(0, i + 1);
+        const passed = subset.filter(x => /pass/i.test(x.result)).length;
+        return Math.round((passed / subset.length) * 100);
+      });
+
+      const ctx = document.getElementById('trendChart').getContext('2d');
+      if (!chart) {
+        chart = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels,
+            datasets: [{
+              label: 'Cumulative Pass Rate (%)',
+              data: passRates,
+              borderWidth: 2,
+              borderColor: '#4aa3ff',
+              tension: 0.2
+            }]
+          },
+          options: { scales: { y: { beginAtZero: true, max: 100 } }, plugins: { legend: { labels: { color: '#e6eaf5' } } } }
+        });
+      } else {
+        chart.data.labels = labels;
+        chart.data.datasets[0].data = passRates;
+        chart.update();
+      }
+    }
+
+    function renderAll() {
+      renderStatsAndLatest(dataRecords);
+      renderTable(dataRecords);
+      renderChart(dataRecords);
+    }
+
+    async function loadAndRender() {
+      try {
+        await fetchFeed();
+        renderAll();
+      } catch (err) {
+        document.getElementById('latest').textContent = 'Failed to load feed: ' + err.message;
+      }
+    }
+
+    const filterEl = document.getElementById('filter');
+    if (filterEl) filterEl.onchange = () => renderAll();
+
+    loadAndRender();
+    setInterval(loadAndRender, 30000);
+  </script>
+</body>
+</html>
