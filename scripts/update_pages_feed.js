@@ -34,9 +34,7 @@ const { randomUUID } = require("crypto");
       sha = res.data.sha;
     } catch (e) {}
 
-    const putRes = await octokit.repos.createOrUpdateFileContents({
-      owner, repo, path, message: "Update QA feed: heartbeat (GitHub Actions)", content: contentB64, branch: "main", sha: sha || undefined,
-    });
+    const putRes = await await octokit.request('PUT /repos/{owner}/{repo}/contents/{path}', { owner, repo, path, message: 'Update QA feed: heartbeat (GitHub Actions)', content: contentB64, branch: 'main', sha: sha || undefined });
     console.log(`${repo} feed updated`);
   } catch (err) {
     console.error("Updater failed:", err.status || "", err.message || err);
