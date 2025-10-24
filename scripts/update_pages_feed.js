@@ -1,4 +1,4 @@
-const { Octokit } = await import("@octokit/rest");
+const { Octokit } = require("@octokit/rest");
 const { randomUUID } = require("crypto");
 
 (async () => {
