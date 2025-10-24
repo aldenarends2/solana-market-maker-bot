@@ -1,7 +1,16 @@
-{
-    "summary":  "Automated QA heartbeat",
-    "status":  "ok",
-    "id":  "c08689ca-ae94-425f-9ec0-38231b7648c9",
-    "repo":  "solana-market-maker-bot",
-    "ts":  "2025-10-24T15:51:17.5138094Z"
-}
+[
+    {
+        "summary":  "Automated QA heartbeat",
+        "status":  "ok",
+        "id":  "c08689ca-ae94-425f-9ec0-38231b7648c9",
+        "repo":  "solana-market-maker-bot",
+        "ts":  "2025-10-24T15:51:17.5138094Z"
+    },
+    {
+        "summary":  "Automated QA heartbeat",
+        "status":  "ok",
+        "id":  "00acf1ae-c7cc-4942-b836-03279dee3b79",
+        "repo":  "solana-market-maker-bot",
+        "ts":  "2025-10-24T15:52:34.6392110Z"
+    }
+]
