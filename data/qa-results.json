@@ -12,5 +12,12 @@
         "id":  "00acf1ae-c7cc-4942-b836-03279dee3b79",
         "repo":  "solana-market-maker-bot",
         "ts":  "2025-10-24T15:52:34.6392110Z"
+    },
+    {
+        "summary":  "Manual QA heartbeat",
+        "status":  "ok",
+        "id":  "ba3a5f8b-d593-49a1-aed3-1e80d47436f2",
+        "repo":  "solana-market-maker-bot",
+        "ts":  "2025-10-24T18:00:55.5072761Z"
     }
 ]
